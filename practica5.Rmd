@@ -244,3 +244,108 @@ El gráfico bidimensional confirma y enriquece las conclusiones obtenidas en los
 - La **predicción más baja** (zona oscura) corresponde a la combinación de **temperatura baja y humedad alta**, es decir, días fríos y húmedos, típicamente invernales y desapacibles.
 - La transición de color es **diagonal**, lo que sugiere una **interacción suave** entre ambas variables: el efecto positivo de la temperatura se ve **atenuado por una humedad elevada**, y el efecto negativo de la humedad se compensa parcialmente con buenas temperaturas.
 - En las **zonas con escasa densidad empírica** (esquina superior izquierda: temperatura muy alta y humedad muy baja; esquina inferior derecha: temperatura muy baja y humedad muy alta) las predicciones del PDP deben interpretarse con cautela, ya que el modelo extrapola sobre combinaciones poco representadas en los datos. Esta es precisamente la limitación que advierte la teoría del PDP cuando hay correlación entre variables.
+
+\newpage
+
+# Ejercicio 3 — PDP: predicción del precio de viviendas
+
+## Carga y muestreo aleatorio
+
+El dataset `kc_house_data.csv` contiene unas 21 000 viviendas. Para que el cálculo del PDP sea tratable se trabaja con una **muestra aleatoria de 1 000 observaciones**, tanto para entrenar el modelo como para evaluar el PDP:
+
+```{r load-house}
+house <- read.csv("data/kc_house_data.csv")
+cat("Dataset original:", nrow(house), "filas\n")
+
+set.seed(42)
+house_sample <- house[sample(nrow(house), 1000), ]
+
+# Las 6 features especificadas en el enunciado.
+house_features <- c("bedrooms", "bathrooms", "sqft_living",
+                    "sqft_lot", "floors", "yr_built")
+house_data <- house_sample[, c(house_features, "price")]
+
+cat("Muestra usada:", nrow(house_data), "filas\n")
+summary(house_data$price)
+```
+
+## Entrenamiento del Random Forest
+
+```{r rf-house}
+set.seed(42)
+rf_house <- randomForest(price ~ ., data = house_data,
+                         ntree = 500, importance = TRUE)
+
+r2_house <- 1 - rf_house$mse[length(rf_house$mse)] / var(house_data$price)
+cat("R² Out-Of-Bag:", round(r2_house, 3), "\n")
+```
+
+El modelo explica aproximadamente el `r round(100 * r2_house, 1)`% de la varianza del precio sobre datos no vistos (validación *out-of-bag*), un resultado razonable considerando que sólo se utilizan 6 variables del total disponible y una muestra reducida.
+
+## Cálculo de los PDP
+
+```{r pdp-house-compute}
+pdp_bedrooms <- compute_pdp(rf_house, house_data, "bedrooms")
+pdp_bathrooms <- compute_pdp(rf_house, house_data, "bathrooms")
+pdp_sqftliv  <- compute_pdp(rf_house, house_data, "sqft_living")
+pdp_floors   <- compute_pdp(rf_house, house_data, "floors")
+```
+
+## Visualización
+
+```{r plot-pdp-house, fig.height=7.5, fig.cap="PDPs unidimensionales para la predicción del precio. El eje vertical está expresado en dólares estadounidenses."}
+plot_pdp_house <- function(pdp_df, rug, xlab, title) {
+  ggplot(pdp_df, aes(x = x, y = yhat)) +
+    geom_line(color = "#b2182b", linewidth = 1.1) +
+    geom_rug(data = data.frame(x = rug), aes(x = x),
+             sides = "b", alpha = 0.25,
+             length = unit(0.025, "npc"),
+             inherit.aes = FALSE) +
+    scale_y_continuous(labels = function(v) paste0("$", format(v / 1000, big.mark = ",", trim = TRUE), "K")) +
+    labs(title = title, x = xlab, y = "Precio predicho") +
+    theme_bw(base_size = 11) +
+    theme(plot.title = element_text(face = "bold", size = 11))
+}
+
+q1 <- plot_pdp_house(pdp_bedrooms,  house_data$bedrooms,
+                     "Bedrooms", "Habitaciones")
+q2 <- plot_pdp_house(pdp_bathrooms, house_data$bathrooms,
+                     "Bathrooms", "Baños")
+q3 <- plot_pdp_house(pdp_sqftliv,   house_data$sqft_living,
+                     "Sqft living", "Superficie habitable (sqft)")
+q4 <- plot_pdp_house(pdp_floors,    house_data$floors,
+                     "Floors", "Plantas")
+
+grid.arrange(q1, q2, q3, q4, ncol = 2)
+```
+
+## Análisis e interpretación
+
+**Habitaciones (`bedrooms`).** El efecto es **positivo pero claramente decreciente**: añadir habitaciones aumenta el precio sólo hasta un punto (3–5 habitaciones), donde la curva se estabiliza o incluso decae ligeramente. Esto es coherente con el mercado inmobiliario: a igualdad de superficie, demasiadas habitaciones implican estancias más pequeñas, lo que **deja de aportar valor**. Además, la densidad empírica está concentrada en 2–5 habitaciones, por lo que los extremos del eje son menos fiables.
+
+**Baños (`bathrooms`).** Relación **positiva y aproximadamente monótona**, más pronunciada que la de las habitaciones. Cada baño adicional aporta un incremento sostenido al precio, especialmente en el rango 1.5–4. Los baños son un indicador claro de **gama y comodidad** de la vivienda, lo que justifica este comportamiento.
+
+**Superficie habitable (`sqft_living`).** Es la variable con **mayor influencia**, con una relación **positiva, fuerte y casi lineal** en el rango central. La pendiente se atenúa en valores muy altos (> 6 000 sqft), donde el mercado se vuelve muy específico y el modelo dispone de pocas observaciones. Este resultado coincide con la intuición económica de que el precio se determina en gran medida por el tamaño de la vivienda.
+
+**Plantas (`floors`).** Efecto **positivo pero modesto**: pasar de una a dos plantas incrementa el precio de manera apreciable, pero más allá la ganancia es pequeña. Hay que tener en cuenta que la variable toma sólo unos pocos valores discretos (1, 1.5, 2, 2.5, 3, 3.5), por lo que el PDP entre esos valores es producto de interpolación más que de un comportamiento real del modelo.
+
+\newpage
+
+# Conclusiones generales
+
+A lo largo de la práctica se ha aplicado el método **Partial Dependency Plot** a dos modelos *Random Forest*, ilustrando su utilidad como herramienta de XAI *model-agnostic*:
+
+1. **Interpretación 1D (bicicletas).** Los PDP revelaron patrones claros y coherentes: un crecimiento sostenido de la demanda en el tiempo, un óptimo térmico en torno a los 28 °C, y efectos disuasorios de la humedad y el viento. Esto demuestra que el Random Forest captura estructura no lineal sin necesidad de definir transformaciones manuales.
+
+2. **Interacción 2D (bicicletas).** El PDP bidimensional `humedad × temperatura` reveló un **efecto multiplicativo y no aditivo**: la combinación más favorable (temperatura alta + humedad baja) dispara la predicción, mientras que la combinación contraria la deprime fuertemente. La distribución empírica conjunta evidenció también las **zonas en las que el PDP debe interpretarse con prudencia**, dado que el modelo extrapola fuera del soporte real.
+
+3. **Interpretación 1D (viviendas).** El análisis del precio mostró que `sqft_living` es la variable dominante, mientras que `bedrooms` muestra **rendimientos decrecientes** y `floors` un efecto modesto. Estos resultados encajan con la intuición económica del sector inmobiliario y refuerzan la confianza en el modelo.
+
+**Limitaciones reconocidas.** El PDP representa el efecto **promedio**: no recoge la heterogeneidad entre instancias (efectos individuales) ni distingue interacciones no incluidas en el subconjunto $x_S$. Para complementar el análisis sería razonable utilizar herramientas como **ICE plots**, **ALE plots** (que mitigan el problema de la dependencia entre variables) o **valores SHAP**.
+
+# Información de la sesión
+
+```{r session-info, echo=FALSE}
+sessionInfo()
+```
+
