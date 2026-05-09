@@ -172,3 +172,75 @@ grid.arrange(p1, p2, p3, p4, ncol = 2)
 **Humedad.** La relación es **negativa**: la predicción se mantiene relativamente plana hasta valores de humedad cercanos a $0.6$ y a partir de ahí **decrece de forma marcada**. Una humedad alta suele asociarse a días lluviosos o nubosos, condiciones que disuaden a los usuarios. La densidad empírica se concentra en el rango $0.4$–$0.8$, donde el efecto es más fiable.
 
 **Velocidad del viento.** Efecto **negativo y aproximadamente monótono**: a más viento, menos alquileres. La caída más pronunciada aparece en el rango $0.1$–$0.4$. Para valores superiores el efecto se atenúa, en parte porque la densidad de observaciones es muy baja (alfombra escasa) y el modelo extrapola con menor confianza.
+
+\newpage
+
+# Ejercicio 2 — PDP bidimensional: humedad y temperatura
+
+## Muestra aleatoria
+
+El cálculo del PDP 2D requiere evaluar el modelo sobre $|grid_1| \times |grid_2| \times n$ filas. Para mantener el coste razonable se extrae una **muestra aleatoria** del dataset, tal y como recomienda el enunciado:
+
+```{r sample-bike}
+set.seed(42)
+bike_sample <- bike_data[sample(nrow(bike_data), 300), ]
+cat("Tamaño de la muestra:", nrow(bike_sample), "filas\n")
+```
+
+## Cálculo del PDP 2D
+
+```{r pdp-2d-compute}
+pdp_2d <- compute_pdp_2d(rf_bike, bike_sample,
+                         f1 = "hum", f2 = "temp",
+                         n_points = 25)
+```
+
+## Visualización
+
+Para evitar huecos entre las celdas se calculan `width` y `height` a partir del paso del *grid*. La densidad empírica de `hum` y `temp` se superpone mediante `geom_rug()` en blanco sobre los ejes inferior e izquierdo, lo que indica las regiones donde el PDP es más fiable.
+
+```{r plot-pdp-2d, fig.height=6, fig.cap="PDP bidimensional para la interacción humedad-temperatura. El color representa la predicción del Random Forest para el número de alquileres. Las marcas blancas en los ejes muestran la densidad empírica de cada variable."}
+tile_w <- diff(range(pdp_2d$hum))  / 24
+tile_h <- diff(range(pdp_2d$temp)) / 24
+
+ggplot(pdp_2d, aes(x = hum, y = temp, fill = yhat)) +
+  geom_tile(width = tile_w, height = tile_h) +
+  geom_rug(data = bike_sample, aes(x = hum, y = temp),
+           inherit.aes = FALSE,
+           alpha = 0.5, color = "white",
+           length = unit(0.02, "npc")) +
+  scale_fill_viridis_c(option = "plasma",
+                       name = "cnt\npredicho") +
+  labs(title = "PDP 2D: Humedad x Temperatura",
+       x = "Humedad (norm.)",
+       y = "Temperatura (norm.)") +
+  theme_bw(base_size = 11) +
+  theme(plot.title = element_text(face = "bold"),
+        legend.position = "right")
+```
+
+\newpage
+
+## Distribución de las variables
+
+Como complemento al PDP, se muestra la distribución marginal conjunta de las dos variables. Esto permite identificar zonas del plano donde el modelo extrapola por escasez de datos.
+
+```{r plot-density, fig.height=4, fig.cap="Distribución empírica conjunta de humedad y temperatura en el dataset (puntos) con curvas de densidad 2D superpuestas."}
+ggplot(bike_data, aes(x = hum, y = temp)) +
+  geom_point(alpha = 0.4, color = "#2166ac", size = 1.4) +
+  geom_density_2d(color = "#b2182b", linewidth = 0.6) +
+  labs(title = "Distribución conjunta humedad-temperatura",
+       x = "Humedad (norm.)",
+       y = "Temperatura (norm.)") +
+  theme_bw(base_size = 11) +
+  theme(plot.title = element_text(face = "bold"))
+```
+
+## Análisis e interpretación
+
+El gráfico bidimensional confirma y enriquece las conclusiones obtenidas en los PDP 1D:
+
+- La **predicción más alta** (zona amarilla brillante) se encuentra en la región de **temperatura alta ($\sim 0.6$–$0.8$) y humedad baja-moderada ($\sim 0.3$–$0.6$)**: días cálidos pero secos, condiciones óptimas para usar la bicicleta.
+- La **predicción más baja** (zona oscura) corresponde a la combinación de **temperatura baja y humedad alta**, es decir, días fríos y húmedos, típicamente invernales y desapacibles.
+- La transición de color es **diagonal**, lo que sugiere una **interacción suave** entre ambas variables: el efecto positivo de la temperatura se ve **atenuado por una humedad elevada**, y el efecto negativo de la humedad se compensa parcialmente con buenas temperaturas.
+- En las **zonas con escasa densidad empírica** (esquina superior izquierda: temperatura muy alta y humedad muy baja; esquina inferior derecha: temperatura muy baja y humedad muy alta) las predicciones del PDP deben interpretarse con cautela, ya que el modelo extrapola sobre combinaciones poco representadas en los datos. Esta es precisamente la limitación que advierte la teoría del PDP cuando hay correlación entre variables.
