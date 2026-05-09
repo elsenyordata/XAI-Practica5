@@ -1,0 +1,174 @@
+---
+title: "XAI Práctica 5: Partial Dependency Plot"
+subtitle: "Métodos *model-agnostic* aplicados a Random Forest"
+author: "elsenyordata"
+date: "`r format(Sys.Date(), '%d de %B de %Y')`"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+    fig_caption: true
+header-includes:
+  - \usepackage{float}
+  - \usepackage[spanish]{babel}
+  - \floatplacement{figure}{H}
+lang: es
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE, warning = FALSE, message = FALSE,
+  fig.align = "center", fig.width = 8, fig.height = 5,
+  out.width = "85%", cache = TRUE
+)
+```
+
+# Introducción y metodología
+
+## Objetivo
+
+Aplicar el método **Partial Dependency Plot (PDP)** a dos problemas de regresión resueltos mediante *Random Forest*, con el fin de **interpretar el comportamiento aprendido por el modelo** sin acceder a su estructura interna (enfoque *model-agnostic*).
+
+## Fundamento del PDP
+
+Sea $\hat{f}$ un modelo entrenado y $\mathbf{x} = (x_S, x_C)$ el vector de entrada, donde $x_S$ es el subconjunto de variables de interés y $x_C$ las restantes. El PDP se define como:
+
+$$
+\hat{f}_{x_S}(x_S) \;=\; \mathbb{E}_{x_C}\!\left[\hat{f}(x_S, x_C)\right] \;\approx\; \frac{1}{n} \sum_{i=1}^{n} \hat{f}\!\left(x_S, x_C^{(i)}\right)
+$$
+
+Es decir: para cada valor de $x_S$, se promedia la predicción del modelo manteniendo el resto de variables fijas en sus valores observados.
+
+**Limitación clave.** El PDP asume independencia entre $x_S$ y $x_C$; cuando existen correlaciones fuertes, los valores promediados pueden corresponder a combinaciones poco realistas de variables. Por este motivo se acompañan los gráficos con la **distribución empírica** de las variables (alfombra inferior o `rug`).
+
+## Carga de paquetes
+
+```{r libraries}
+library(randomForest)
+library(ggplot2)
+library(dplyr)
+library(gridExtra)
+library(viridis)
+```
+
+## Función PDP genérica
+
+A continuación se implementa el algoritmo **manualmente** (en lugar de usar el paquete `pdp`) para mostrar de forma transparente el cálculo:
+
+```{r pdp-function}
+# PDP unidimensional.
+# Para cada valor del grid se reemplaza la feature en todo el dataset
+# y se promedian las predicciones del modelo.
+compute_pdp <- function(model, data, feature, n_points = 50) {
+  values <- seq(min(data[[feature]]), max(data[[feature]]),
+                length.out = n_points)
+  yhat <- vapply(values, function(v) {
+    d <- data
+    d[[feature]] <- v
+    mean(predict(model, d))
+  }, numeric(1))
+  data.frame(x = values, yhat = yhat)
+}
+
+# PDP bidimensional. Igual idea sobre dos features simultáneas.
+compute_pdp_2d <- function(model, data, f1, f2, n_points = 20) {
+  v1 <- seq(min(data[[f1]]), max(data[[f1]]), length.out = n_points)
+  v2 <- seq(min(data[[f2]]), max(data[[f2]]), length.out = n_points)
+  grid <- expand.grid(v1 = v1, v2 = v2)
+  names(grid) <- c(f1, f2)
+  grid$yhat <- vapply(seq_len(nrow(grid)), function(i) {
+    d <- data
+    d[[f1]] <- grid[[f1]][i]
+    d[[f2]] <- grid[[f2]][i]
+    mean(predict(model, d))
+  }, numeric(1))
+  grid
+}
+```
+
+\newpage
+
+# Ejercicio 1 — PDP unidimensional: alquiler de bicicletas
+
+## Carga y preparación de datos
+
+```{r load-bike}
+day <- read.csv("data/day.csv")
+
+# La columna 'instant' es un índice secuencial diario que comienza en 1
+# y corresponde al 1 de enero de 2011. Por tanto representa exactamente
+# "días desde 2011".
+day$days_since_2011 <- day$instant
+
+# Variables que entrarán al Random Forest. Se incluyen tanto las
+# que se analizarán mediante PDP como el resto de variables relevantes,
+# para que el modelo disponga del contexto completo.
+bike_features <- c("days_since_2011", "temp", "hum", "windspeed",
+                   "season", "yr", "mnth", "holiday", "weekday",
+                   "workingday", "weathersit")
+bike_data <- day[, c(bike_features, "cnt")]
+
+cat("Dimensiones del dataset:", nrow(bike_data), "x", ncol(bike_data), "\n")
+```
+
+> **Nota sobre la escala de las variables.** En el *Bike Sharing Dataset* original, `temp`, `hum` y `windspeed` están **normalizadas en el rango [0, 1]**: `temp` dividida entre 41 °C, `hum` entre 100 %, `windspeed` entre 67. Esta normalización se mantiene tal cual en los gráficos para preservar la coherencia con el dataset.
+
+## Entrenamiento del Random Forest
+
+```{r rf-bike}
+set.seed(42)
+rf_bike <- randomForest(cnt ~ ., data = bike_data,
+                        ntree = 500, importance = TRUE)
+
+r2_bike <- 1 - rf_bike$mse[length(rf_bike$mse)] / var(bike_data$cnt)
+cat("R² Out-Of-Bag:", round(r2_bike, 3), "\n")
+```
+
+El modelo alcanza un ajuste muy alto (R² OOB ≈ `r round(r2_bike, 3)`), lo que respalda la fiabilidad de los PDP calculados a continuación.
+
+## Cálculo de los PDP
+
+```{r pdp-bike-compute}
+pdp_days <- compute_pdp(rf_bike, bike_data, "days_since_2011")
+pdp_temp <- compute_pdp(rf_bike, bike_data, "temp")
+pdp_hum  <- compute_pdp(rf_bike, bike_data, "hum")
+pdp_wind <- compute_pdp(rf_bike, bike_data, "windspeed")
+```
+
+## Visualización
+
+```{r plot-pdp-bike, fig.height=7.5, fig.cap="PDPs unidimensionales sobre el modelo de alquiler de bicicletas. La línea azul muestra el efecto marginal aprendido por el Random Forest; la alfombra inferior representa la distribución empírica de la variable correspondiente."}
+plot_pdp <- function(pdp_df, rug, xlab, title) {
+  ggplot(pdp_df, aes(x = x, y = yhat)) +
+    geom_line(color = "#2166ac", linewidth = 1.1) +
+    geom_rug(data = data.frame(x = rug), aes(x = x),
+             sides = "b", alpha = 0.25,
+             length = unit(0.025, "npc"),
+             inherit.aes = FALSE) +
+    labs(title = title, x = xlab, y = "Predicción de cnt") +
+    theme_bw(base_size = 11) +
+    theme(plot.title = element_text(face = "bold", size = 11))
+}
+
+p1 <- plot_pdp(pdp_days, bike_data$days_since_2011,
+               "Días desde 2011", "Días desde 2011")
+p2 <- plot_pdp(pdp_temp, bike_data$temp,
+               "Temperatura (norm.)", "Temperatura")
+p3 <- plot_pdp(pdp_hum, bike_data$hum,
+               "Humedad (norm.)", "Humedad")
+p4 <- plot_pdp(pdp_wind, bike_data$windspeed,
+               "Velocidad del viento (norm.)", "Viento")
+
+grid.arrange(p1, p2, p3, p4, ncol = 2)
+```
+
+## Análisis e interpretación
+
+**Días desde 2011.** Se observa una **tendencia creciente clara y prácticamente monótona**: la predicción del número de alquileres pasa de unos ~3 000 a comienzos de 2011 hasta ~5 500 a finales de 2012. Este patrón refleja la **adopción progresiva del servicio de bike-sharing** a lo largo de esos dos años, un efecto temporal puro independiente del clima. La pendiente se atenúa hacia el final, lo que sugiere una **saturación parcial** del crecimiento.
+
+**Temperatura.** Existe una relación **positiva no lineal con forma de campana asimétrica**: a partir de aproximadamente $0.15$ (≈ 6 °C) los alquileres crecen rápidamente, alcanzan un **máximo en torno a $0.65$–$0.70$** (≈ 27–29 °C), y descienden ligeramente en valores extremos. Esto coincide con la intuición: temperaturas demasiado frías o excesivamente cálidas desincentivan el uso de la bicicleta. La curva confirma que el modelo ha capturado un **óptimo térmico** y no una relación puramente lineal.
+
+**Humedad.** La relación es **negativa**: la predicción se mantiene relativamente plana hasta valores de humedad cercanos a $0.6$ y a partir de ahí **decrece de forma marcada**. Una humedad alta suele asociarse a días lluviosos o nubosos, condiciones que disuaden a los usuarios. La densidad empírica se concentra en el rango $0.4$–$0.8$, donde el efecto es más fiable.
+
+**Velocidad del viento.** Efecto **negativo y aproximadamente monótono**: a más viento, menos alquileres. La caída más pronunciada aparece en el rango $0.1$–$0.4$. Para valores superiores el efecto se atenúa, en parte porque la densidad de observaciones es muy baja (alfombra escasa) y el modelo extrapola con menor confianza.
