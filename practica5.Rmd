@@ -9,9 +9,9 @@ output:
     toc_depth: 2
     number_sections: true
     fig_caption: true
+    latex_engine: xelatex
 header-includes:
   - \usepackage{float}
-  - \usepackage[spanish]{babel}
   - \floatplacement{figure}{H}
 lang: es
 ---
@@ -125,7 +125,7 @@ r2_bike <- 1 - rf_bike$mse[length(rf_bike$mse)] / var(bike_data$cnt)
 cat("R² Out-Of-Bag:", round(r2_bike, 3), "\n")
 ```
 
-El modelo alcanza un ajuste muy alto (R² OOB ≈ `r round(r2_bike, 3)`), lo que respalda la fiabilidad de los PDP calculados a continuación.
+El modelo alcanza un ajuste muy alto (R² OOB $\approx$ `r round(r2_bike, 3)`), lo que respalda la fiabilidad de los PDP calculados a continuación.
 
 ## Cálculo de los PDP
 
@@ -167,7 +167,7 @@ grid.arrange(p1, p2, p3, p4, ncol = 2)
 
 **Días desde 2011.** Se observa una **tendencia creciente clara y prácticamente monótona**: la predicción del número de alquileres pasa de unos ~3 000 a comienzos de 2011 hasta ~5 500 a finales de 2012. Este patrón refleja la **adopción progresiva del servicio de bike-sharing** a lo largo de esos dos años, un efecto temporal puro independiente del clima. La pendiente se atenúa hacia el final, lo que sugiere una **saturación parcial** del crecimiento.
 
-**Temperatura.** Existe una relación **positiva no lineal con forma de campana asimétrica**: a partir de aproximadamente $0.15$ (≈ 6 °C) los alquileres crecen rápidamente, alcanzan un **máximo en torno a $0.65$–$0.70$** (≈ 27–29 °C), y descienden ligeramente en valores extremos. Esto coincide con la intuición: temperaturas demasiado frías o excesivamente cálidas desincentivan el uso de la bicicleta. La curva confirma que el modelo ha capturado un **óptimo térmico** y no una relación puramente lineal.
+**Temperatura.** Existe una relación **positiva no lineal con forma de campana asimétrica**: a partir de aproximadamente $0.15$ ($\approx$ 6 °C) los alquileres crecen rápidamente, alcanzan un **máximo en torno a $0.65$–$0.70$** ($\approx$ 27–29 °C), y descienden ligeramente en valores extremos. Esto coincide con la intuición: temperaturas demasiado frías o excesivamente cálidas desincentivan el uso de la bicicleta. La curva confirma que el modelo ha capturado un **óptimo térmico** y no una relación puramente lineal.
 
 **Humedad.** La relación es **negativa**: la predicción se mantiene relativamente plana hasta valores de humedad cercanos a $0.6$ y a partir de ahí **decrece de forma marcada**. Una humedad alta suele asociarse a días lluviosos o nubosos, condiciones que disuaden a los usuarios. La densidad empírica se concentra en el rango $0.4$–$0.8$, donde el efecto es más fiable.
 
