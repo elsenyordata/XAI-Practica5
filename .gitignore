@@ -1,0 +1,32 @@
+# R session and history
+.Rhistory
+.Rapp.history
+.RData
+.Ruserdata
+
+# RStudio project files
+.Rproj.user/
+*.Rproj
+
+# Knitr / RMarkdown auxiliary outputs
+*_files/
+*_cache/
+*.utf8.md
+*.knit.md
+*.log
+*.aux
+*.out
+*.toc
+*.nav
+*.snm
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+*.tex
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code local config
+.claude/
