@@ -44,5 +44,8 @@ rmarkdown::render("practica5.Rmd")
 | 3 | PDP 1D (viviendas) | Random Forest sobre `price`. PDP de `bedrooms`, `bathrooms`, `sqft_living`, `floors`. |
 
 ## Autor
+- Vizoso Sellem, César Aaron
+- Llacer Llorca, Vicente
+- Mao, Jiale
 
 elsenyordata — Universidad — Curso 2025/26
