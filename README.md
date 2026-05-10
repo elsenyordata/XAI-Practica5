@@ -48,4 +48,4 @@ rmarkdown::render("practica5.Rmd")
 - Llacer Llorca, Vicente
 - Mao, Jiale
 
-elsenyordata — Universidad — Curso 2025/26
+ — Universidad Politecnica de Valencia -  GCD — Curso 2025/26
