@@ -1,48 +1,51 @@
-# XAI Práctica 5 — Partial Dependency Plot (PDP)
+# XAI Practice 5 — Partial Dependency Plot (PDP)
 
-Práctica de la asignatura **Evaluación de Modelos (EDM)** dedicada a métodos *model-agnostic* de Inteligencia Artificial Explicable (XAI). En concreto, se aplica el **Partial Dependency Plot (PDP)** para interpretar dos modelos de tipo *Random Forest*:
+Practice for the subject **Model Evaluation (EDM)** focused on *model-agnostic* methods of Explainable Artificial Intelligence (XAI). Specifically, the **Partial Dependency Plot (PDP)** is applied to interpret two *Random Forest* models:
 
-1. **Predicción del alquiler diario de bicicletas** (Bike Sharing Dataset).
-2. **Predicción del precio de viviendas** (King County House Sales).
+1. **Daily bike rental prediction** (Bike Sharing Dataset).
+2. **House price prediction** (King County House Sales).
 
-## Estructura del repositorio
+## Repository structure
 
 ```
 .
 ├── data/
-│   ├── day.csv             # Bike Sharing - registros diarios
-│   ├── hour.csv            # Bike Sharing - registros horarios
+│   ├── day.csv             # Bike Sharing - daily records
+│   ├── hour.csv            # Bike Sharing - hourly records
 │   └── kc_house_data.csv   # King County house sales
-├── practica5.Rmd           # Código + análisis (fuente única)
-├── practica5.pdf           # Informe compilado
-├── enunciado_XAI3.pdf      # Enunciado original de la práctica
+├── practica5.Rmd           # Code + analysis (single source)
+├── practica5.pdf           # Compiled report
+├── enunciado_XAI3.pdf      # Original practice statement
 └── README.md
 ```
 
-## Reproducibilidad
+## Reproducibility
 
-Requiere R ≥ 4.0 con los siguientes paquetes:
+Requires R ≥ 4.0 with the following packages:
 
 ```r
 install.packages(c("randomForest", "ggplot2", "dplyr",
                    "gridExtra", "viridis", "rmarkdown", "knitr", "tinytex"))
-tinytex::install_tinytex()   # Solo si no se dispone de una distribución LaTeX
+tinytex::install_tinytex()   # Only if no LaTeX distribution is available
 ```
 
-Para regenerar el informe:
+To regenerate the report:
 
 ```r
 rmarkdown::render("practica5.Rmd")
 ```
 
-## Contenido del informe
+## Report content
 
-| Sección | Ejercicio | Descripción |
+| Section | Exercise | Description |
 |---|---|---|
-| 1 | PDP 1D (bicicletas) | Random Forest sobre `cnt`. PDP de `days_since_2011`, `temp`, `hum`, `windspeed`. |
-| 2 | PDP 2D (bicicletas) | Interacción `humidity` × `temperature` con `geom_tile()` y densidad marginal. |
-| 3 | PDP 1D (viviendas) | Random Forest sobre `price`. PDP de `bedrooms`, `bathrooms`, `sqft_living`, `floors`. |
+| 1 | 1D PDP (bikes) | Random Forest on `cnt`. PDP of `days_since_2011`, `temp`, `hum`, `windspeed`. |
+| 2 | 2D PDP (bikes) | `humidity` × `temperature` interaction with `geom_tile()` and marginal density. |
+| 3 | 1D PDP (houses) | Random Forest on `price`. PDP of `bedrooms`, `bathrooms`, `sqft_living`, `floors`. |
 
-## Autor
+## Authors
+- Vizoso Sellem, César Aaron
+- Llacer Llorca, Vicente
+- Mao, Jiale
 
-elsenyordata — Universidad — Curso 2025/26
+Universitat Politècnica de València — GCD — Academic year 2025/26
